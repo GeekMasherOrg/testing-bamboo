@@ -1,0 +1,32 @@
+---
+version: 2
+plan:
+  project-key: CQL
+  key: CQL
+  name: Testing Bamboo
+
+stages:
+  - Scan
+
+
+variables:
+  githubRepository: GeekMasherOrg/testing-bamboo
+  codeqlLanguage: javascript
+
+Scan:
+  tasks:
+    - script:
+        # Install CodeQL dynamically
+        - wget https://github.com/github/codeql-action/releases/latest/download/codeql-bundle-linux64.tar.gz -O ../codeql-bundle-linux64.tar.gz
+        - tar xzvf ../codeql-bundle-linux64.tar.gz -C ../
+        - rm ../codeql-bundle-linux64.tar.gz
+        - export PATH=$(cd ..; pwd)/codeql:$PATH
+
+        # Initial CodeQL
+        - codeql database create --language=${bamboo.codeqlLanguage} --github-auth-stdin --source-root . .codeql-database
+
+        # Analyze
+        - codeql database analyze --format="sarif-latest" --output=".codeql-results.sarif" .codeql-database ${bamboo.codeqlLanguage}-code-scanning.qls
+
+        # Uploading the results to GitHub.
+        - codeql github upload-results -r "${bamboo.githubRepository}" -f "refs/heads/$(git rev-parse --abbrev-ref HEAD)" -c "$(git rev-parse HEAD)" -s ".codeql-results.sarif"
